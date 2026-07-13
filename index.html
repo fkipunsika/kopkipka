@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KOPKIPKA - Sistem Keuangan Koperasi</title>
+    <!-- Chosen Palette: Warm Professional Blue -->
+    <!-- Application Structure Plan: 
+        Aplikasi menggunakan role-based access control. 
+        Fitur Tambah/Kelola Anggota hanya muncul jika user.role === 'KETUA'.
+        Data anggota disimpan di sheet 'Pengguna'.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        :root { --bg-warm: #FDFCFB; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-warm); }
+        .nav-active { @apply bg-blue-50 text-blue-700 border-l-4 border-blue-700; }
+        .loader-overlay { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(4px); }
+        @media print { .no-print { display: none !important; } .print-area { display: block !important; } }
+    </style>
+</head>
+<body class="antialiased text-slate-800">
+
+    <div id="fullLoader" class="fixed inset-0 z-[9999] flex flex-col items-center justify-center loader-overlay hidden">
+        <div class="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        <p class="mt-4 font-medium text-blue-800 text-sm">Memproses data...</p>
+    </div>
+
+    <!-- LOGIN PAGE -->
+    <section id="loginPage" class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-700 to-indigo-900">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md">
+            <div class="text-center mb-8">
+                <div class="inline-flex items-center justify-center w-20 h-20 bg-blue-50 rounded-full mb-4 border border-blue-100 overflow-hidden">
+                    <img src="https://i.ibb.co.com/TxrbX7rz/Whats-App-Image-2026-07-09-at-14-00-18.jpg" alt="Logo" class="w-full h-full object-cover">
+                </div>
+                <h1 class="text-2xl font-bold text-slate-900">KOPKIPKA</h1>
+                <p class="text-slate-500 text-sm">Sistem Keuangan Koperasi</p>
+            </div>
+            <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Username</label>
+                    <input type="text" id="username" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Password</label>
+                    <input type="password" id="password" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-lg transition-all transform active:scale-95">Masuk ke Sistem</button>
+                <div class="bg-slate-50 p-3 rounded-lg text-[10px] text-slate-500 text-center leading-relaxed">
+                    Default Password: <span class="font-bold">Admin@2026</span><br>
+                    Login: ketua | bendahara | anggota
+                </div>
+            </form>
+        </div>
+    </section>
+
+    <!-- MAIN APP -->
+    <section id="mainApp" class="flex min-h-screen hidden">
+        <aside class="fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-slate-200 transform -translate-x-full lg:translate-x-0 transition-transform no-print">
+            <div class="flex flex-col h-full">
+                <div class="p-6 border-b flex items-center gap-3">
+                    <img src="https://i.ibb.co.com/5gt6m6YX/Whats-App-Image-2026-07-09-at-14-00-18.jpg" class="w-8 h-8 rounded shadow-sm">
+                    <h2 class="font-bold text-slate-900 tracking-tight">KOPKIPKA</h2>
+                </div>
+                <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+                    <button onclick="showPage('dashboard', this)" class="nav-item-custom w-full flex items-center gap-3 px-4 py-3 rounded-lg text-slate-600 hover:bg-slate-50 nav-active">
+                        <i class="fas fa-home w-5 text-center"></i> Dashboard
+                    </button>
+                    <button onclick="showPage('pemasukan', this)" class="nav-item-custom w-full flex items-center gap-3 px-4 py-3 rounded-lg text-slate-600 hover:bg-slate-50">
+                        <i class="fas fa-plus-circle w-5 text-center text-emerald-500"></i> Pemasukan
+                    </button>
+                    <button onclick="showPage('pengeluaran', this)" class="nav-item-custom w-full flex items-center gap-3 px-4 py-3 rounded-lg text-slate-600 hover:bg-slate-50">
+                        <i class="fas fa-minus-circle w-5 text-center text-rose-500"></i> Pengeluaran
+                    </button>
+                    <button onclick="showPage('saldo', this)" class="nav-item-custom w-full flex items-center gap-3 px-4 py-3 rounded-lg text-slate-600 hover:bg-slate-50">
+                        <i class="fas fa-wallet w-5 text-center"></i> Saldo Mutasi
+                    </button>
+                    <button onclick="showPage('laporan', this)" class="nav-item-custom w-full flex items-center gap-3 px-4 py-3 rounded-lg text-slate-600 hover:bg-slate-50">
+                        <i class="fas fa-file-invoice-dollar w-5 text-center"></i> Laporan
+                    </button>
+
+                    <div id="adminMenu" class="pt-4 mt-4 border-t hidden">
+                        <p class="px-4 text-[10px] font-bold text-slate-400 uppercase mb-2 tracking-widest">Administrator</p>
+                        <button onclick="showPage('log', this)" class="nav-item-custom w-full flex items-center gap-3 px-4 py-3 rounded-lg text-slate-600 hover:bg-slate-50">
+                            <i class="fas fa-history w-5 text-center text-slate-400"></i> Log Aktivitas
+                        </button>
+                        <button id="menuAkun" onclick="showPage('akun', this)" class="nav-item-custom w-full flex items-center gap-3 px-4 py-3 rounded-lg text-slate-600 hover:bg-slate-50 hidden">
+                            <i class="fas fa-users w-5 text-center text-blue-500"></i> Manajemen Akun
+                        </button>
+                    </div>
+                </nav>
+                <div class="p-4 border-t">
+                    <button onclick="logout()" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-rose-600 hover:bg-rose-50 font-bold text-sm">
+                        <i class="fas fa-sign-out-alt"></i> Logout Sesi
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <main class="flex-1 lg:ml-64 flex flex-col bg-slate-50">
+            <header class="h-16 bg-white border-b flex items-center justify-between px-6 sticky top-0 z-30 no-print">
+                <h2 id="pageTitle" class="text-lg font-bold text-slate-800">Dashboard</h2>
+                <div class="flex items-center gap-3">
+                    <div class="text-right hidden sm:block">
+                        <p id="dispName" class="text-sm font-bold text-slate-900 leading-none">-</p>
+                        <p id="dispRole" class="text-[10px] text-blue-600 font-bold uppercase tracking-tighter">-</p>
+                    </div>
+                    <div class="w-10 h-10 bg-blue-50 border border-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
+                        <i class="fas fa-user-circle text-xl"></i>
+                    </div>
+                </div>
+            </header>
+
+            <div class="p-6 max-w-6xl mx-auto w-full">
+                <!-- PAGE DASHBOARD -->
+                <div id="page-dashboard" class="app-page space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                            <p class="text-slate-400 text-[10px] font-bold uppercase mb-1">Total Saldo Kas</p>
+                            <h3 id="dashSaldo" class="text-2xl font-black text-blue-700">Rp 0</h3>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                            <p class="text-slate-400 text-[10px] font-bold uppercase mb-1">Pemasukan (Bulan Ini)</p>
+                            <h3 id="dashMasuk" class="text-2xl font-black text-emerald-600">Rp 0</h3>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                            <p class="text-slate-400 text-[10px] font-bold uppercase mb-1">Pengeluaran (Bulan Ini)</p>
+                            <h3 id="dashKeluar" class="text-2xl font-black text-rose-600">Rp 0</h3>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+                        <div class="p-4 border-b bg-slate-50/50 flex justify-between items-center">
+                            <h4 class="font-bold text-sm">Aktivitas Terkini</h4>
+                            <i class="fas fa-bolt text-yellow-500"></i>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-xs">
+                                <thead>
+                                    <tr class="text-slate-400 border-b">
+                                        <th class="p-4 text-left font-bold uppercase">Tanggal</th>
+                                        <th class="p-4 text-left font-bold uppercase">Jenis</th>
+                                        <th class="p-4 text-left font-bold uppercase">Nominal</th>
+                                        <th class="p-4 text-left font-bold uppercase">Keterangan</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dashTrxBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PAGE AKUN (KHUSUS KETUA) -->
+                <div id="page-akun" class="app-page hidden space-y-6">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h3 class="text-lg font-bold">Daftar Pengurus & Anggota</h3>
+                            <p class="text-xs text-slate-500">Kelola hak akses pengguna sistem</p>
+                        </div>
+                        <button onclick="openUserForm()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md flex items-center gap-2">
+                            <i class="fas fa-user-plus"></i> Tambah Anggota
+                        </button>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+                        <table class="w-full text-sm">
+                            <thead class="bg-slate-50 border-b">
+                                <tr>
+                                    <th class="p-4 text-left font-bold">Nama Lengkap</th>
+                                    <th class="p-4 text-left font-bold">Username</th>
+                                    <th class="p-4 text-left font-bold">Jabatan/Role</th>
+                                    <th class="p-4 text-center font-bold">Status</th>
+                                    <th class="p-4 text-center font-bold">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="akunBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- MODUL TRANSAKSI (Sama seperti sebelumnya dengan styling ditingkatkan) -->
+                <div id="page-pemasukan" class="app-page hidden space-y-6">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-lg font-bold">Riwayat Pemasukan</h3>
+                        <button onclick="openTrxForm('PEMASUKAN')" class="btn-privilege bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-blue-700">
+                            <i class="fas fa-plus mr-2"></i> Input Pemasukan
+                        </button>
+                    </div>
+                    <div class="bg-white rounded-xl border overflow-hidden shadow-sm">
+                        <table class="w-full text-xs">
+                            <thead class="bg-slate-50 border-b uppercase text-slate-400">
+                                <tr><th class="p-4 text-left">Tanggal</th><th class="p-4 text-left">Kategori</th><th class="p-4 text-left">Sumber</th><th class="p-4 text-right">Nominal</th><th class="p-4 text-center">Aksi</th></tr>
+                            </thead>
+                            <tbody id="pemasukanBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="page-pengeluaran" class="app-page hidden space-y-6">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-lg font-bold">Riwayat Pengeluaran</h3>
+                        <button onclick="openTrxForm('PENGELUARAN')" class="btn-privilege bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-blue-700">
+                            <i class="fas fa-plus mr-2"></i> Input Pengeluaran
+                        </button>
+                    </div>
+                    <div class="bg-white rounded-xl border overflow-hidden shadow-sm">
+                        <table class="w-full text-xs">
+                            <thead class="bg-slate-50 border-b uppercase text-slate-400">
+                                <tr><th class="p-4 text-left">Tanggal</th><th class="p-4 text-left">Kategori</th><th class="p-4 text-left">Penerima</th><th class="p-4 text-right">Nominal</th><th class="p-4 text-center">Aksi</th></tr>
+                            </thead>
+                            <tbody id="pengeluaranBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="page-saldo" class="app-page hidden space-y-6">
+                    <div class="bg-white p-6 rounded-xl border">
+                        <h3 class="font-bold text-sm mb-4">Semua Aliran Kas</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-xs">
+                                <thead class="bg-slate-50 border-b"><tr class="text-slate-400">
+                                    <th class="p-3 text-left">Tanggal</th><th class="p-3 text-left">No. Trx</th><th class="p-3 text-left">Jenis</th><th class="p-3 text-right">Nominal</th>
+                                </tr></thead>
+                                <tbody id="saldoBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="page-laporan" class="app-page hidden space-y-6">
+                    <div class="bg-white p-6 rounded-xl border no-print shadow-sm">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Pilih Bulan</label>
+                                <select id="lapBulan" class="w-full border p-2 rounded-lg text-sm bg-slate-50 outline-none">
+                                    <option value="01">Januari</option><option value="02">Februari</option><option value="03">Maret</option>
+                                    <option value="04">April</option><option value="05">Mei</option><option value="06">Juni</option>
+                                    <option value="07">Juli</option><option value="08">Agustus</option><option value="09">September</option>
+                                    <option value="10">Oktober</option><option value="11">November</option><option value="12">Desember</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Pilih Tahun</label>
+                                <select id="lapTahun" class="w-full border p-2 rounded-lg text-sm bg-slate-50 outline-none">
+                                    <option value="2025">2025</option><option value="2026" selected>2026</option>
+                                </select>
+                            </div>
+                            <button onclick="generateLaporan()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-lg text-sm transition-all shadow-md">Tampilkan Rekap</button>
+                        </div>
+                    </div>
+                    <div id="printArea" class="bg-white p-10 rounded-xl border hidden shadow-2xl">
+                        <div class="text-center border-b pb-6 mb-6">
+                            <img src="https://i.ibb.co.com/5gt6m6YX/Whats-App-Image-2026-07-09-at-14-00-18.jpg" class="w-16 mx-auto mb-4 grayscale">
+                            <h2 class="text-xl font-black">LAPORAN KEUANGAN KOPKIPKA</h2>
+                            <p id="lapPeriodeText" class="text-slate-400 uppercase tracking-[0.2em] text-[10px] mt-1"></p>
+                        </div>
+                        <div class="grid grid-cols-2 gap-8 mb-8">
+                            <div class="border-l-4 border-emerald-500 p-4 bg-emerald-50/30">
+                                <p class="text-[10px] font-bold text-emerald-700 uppercase">Total Pemasukan</p>
+                                <p id="lapTotalMasuk" class="text-lg font-black text-slate-900"></p>
+                            </div>
+                            <div class="border-l-4 border-rose-500 p-4 bg-rose-50/30">
+                                <p class="text-[10px] font-bold text-rose-700 uppercase">Total Pengeluaran</p>
+                                <p id="lapTotalKeluar" class="text-lg font-black text-slate-900"></p>
+                            </div>
+                        </div>
+                        <table class="w-full text-[10px] border">
+                            <thead><tr class="bg-slate-100 uppercase">
+                                <th class="border p-2">Tanggal</th><th class="border p-2">No. Trx</th><th class="border p-2 text-left">Keterangan</th><th class="border p-2 text-right">In</th><th class="border p-2 text-right">Out</th>
+                            </tr></thead>
+                            <tbody id="lapTableBody"></tbody>
+                        </table>
+                        <div class="mt-10 flex justify-end no-print">
+                            <button onclick="window.print()" class="bg-slate-900 text-white px-6 py-2 rounded-lg text-xs font-bold hover:bg-black"><i class="fas fa-print mr-2"></i> Cetak Laporan</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="page-log" class="app-page hidden space-y-6">
+                    <div class="bg-white rounded-xl border shadow-sm">
+                        <div class="p-4 border-b font-bold text-sm">Log Audit Sistem</div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-[10px]">
+                                <thead><tr class="bg-slate-50 text-slate-400 uppercase"><th class="p-3 text-left">Waktu</th><th class="p-3 text-left">User</th><th class="p-3 text-left">Aksi</th><th class="p-3 text-left">Modul</th><th class="p-3 text-left">Detail</th></tr></thead>
+                                <tbody id="logBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </section>
+
+    <!-- MODAL FORM TRANSAKSI -->
+    <div id="modalTrx" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm hidden">
+        <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl scale-in">
+            <div class="flex justify-between items-center mb-6">
+                <h3 id="modalTitle" class="text-lg font-black text-slate-900">Form Transaksi</h3>
+                <button onclick="closeTrx()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-400 hover:text-rose-600 transition-colors"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="formTrx" onsubmit="handleSaveTrx(event)" class="space-y-4">
+                <input type="hidden" id="f_id">
+                <input type="hidden" id="f_jenis">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tanggal</label>
+                        <input type="date" id="f_tanggal" required class="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Kategori</label>
+                        <select id="f_kategori" required class="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"></select>
+                    </div>
+                </div>
+                <div>
+                    <label id="labelPihak" class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Pihak</label>
+                    <input type="text" id="f_pihak" required class="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="...">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nominal (Rp)</label>
+                    <input type="number" id="f_nominal" required class="w-full border p-2 rounded-lg text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Keterangan Tambahan</label>
+                    <textarea id="f_keterangan" rows="2" class="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-blue-700 transition-all">Simpan Transaksi</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL FORM AKUN (KHUSUS KETUA) -->
+    <div id="modalAkun" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm hidden">
+        <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-6">
+                <h3 id="userModalTitle" class="text-lg font-black text-slate-900">Kelola Anggota</h3>
+                <button onclick="closeUserModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-400 hover:text-rose-600"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="formAkun" onsubmit="handleSaveUser(event)" class="space-y-4">
+                <input type="hidden" id="u_id">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nama Lengkap</label>
+                    <input type="text" id="u_nama" required class="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Username Login</label>
+                    <input type="text" id="u_username" required class="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div id="passField">
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Password</label>
+                    <input type="password" id="u_password" class="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    <p class="text-[9px] text-slate-400 mt-1 italic">*Kosongkan jika tidak ingin mengubah password saat edit</p>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Jabatan/Role</label>
+                        <select id="u_role" required class="w-full border p-2 rounded-lg text-sm bg-slate-50">
+                            <option value="MEMBER">Anggota</option>
+                            <option value="BENDAHARA">Bendahara</option>
+                            <option value="KETUA">Ketua</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Status Akun</label>
+                        <select id="u_status" required class="w-full border p-2 rounded-lg text-sm bg-slate-50">
+                            <option value="AKTIF">Aktif</option>
+                            <option value="NONAKTIF">Non-Aktif</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-blue-700 mt-2">Daftarkan / Update Anggota</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            const Auth = {
+                token: localStorage.getItem('k_token'),
+                user: JSON.parse(localStorage.getItem('k_user')),
+                init() { if (this.token) checkLoginState(); },
+                save(token, user) {
+                    this.token = token; this.user = user;
+                    localStorage.setItem('k_token', token);
+                    localStorage.setItem('k_user', JSON.stringify(user));
+                    checkLoginState();
+                },
+                clear() {
+                    localStorage.clear();
+                    this.token = null; this.user = null;
+                    checkLoginState();
+                }
+            };
+
+         // WAJIB: Masukkan URL Web App Google Apps Script Anda di sini!
+            const API_URL = 'https://script.google.com/macros/s/AKfycbycKwLcxujDayEMTOfL8uSbZxNneeAMvPXXR45bCeHP5_gJgn_DmjNAXMU11TgeHAg/exec'; 
+
+            async function gasRun(func, ...args) {
+                try {
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain' }, // Gunakan text/plain untuk melewati blokir CORS Preflight
+                        body: JSON.stringify({ action: func, args: args }),
+                        redirect: 'follow'
+                    });
+                    return await response.json();
+                } catch (error) {
+                    console.error("API Fetch Error:", error);
+                    throw error;
+                }
+            }
+            function showLoader(v) { document.getElementById('fullLoader').classList.toggle('hidden', !v); }
+
+            window.handleLogin = async (e) => {
+                e.preventDefault();
+                showLoader(true);
+                const res = await gasRun('loginUser', document.getElementById('username').value, document.getElementById('password').value);
+                showLoader(false);
+                if (res.success) Auth.save(res.token, res.user);
+                else Swal.fire('Gagal', res.message, 'error');
+            };
+
+            window.logout = () => {
+                showLoader(true);
+                gasRun('destroySession', Auth.token).then(() => { Auth.clear(); showLoader(false); });
+            };
+
+            function checkLoginState() {
+                const lp = document.getElementById('loginPage');
+                const ma = document.getElementById('mainApp');
+                if (Auth.token) {
+                    lp.classList.add('hidden'); ma.classList.remove('hidden');
+                    document.getElementById('dispName').innerText = Auth.user.nama;
+                    document.getElementById('dispRole').innerText = Auth.user.role;
+                    
+                    const isAdmin = Auth.user.role === 'KETUA' || Auth.user.role === 'BENDAHARA';
+                    document.getElementById('adminMenu').classList.toggle('hidden', !isAdmin);
+                    document.getElementById('menuAkun').classList.toggle('hidden', Auth.user.role !== 'KETUA');
+                    document.querySelectorAll('.btn-privilege').forEach(b => b.style.display = isAdmin ? 'block' : 'none');
+                    
+                    showPage('dashboard');
+                } else { lp.classList.remove('hidden'); ma.classList.add('hidden'); }
+            }
+
+            let activePage = 'dashboard';
+            window.showPage = (id, el) => {
+                activePage = id;
+                document.querySelectorAll('.app-page').forEach(p => p.classList.add('hidden'));
+                document.getElementById('page-' + id).classList.remove('hidden');
+                document.getElementById('pageTitle').innerText = id.charAt(0).toUpperCase() + id.slice(1);
+                document.querySelectorAll('.nav-item-custom').forEach(n => n.classList.remove('nav-active'));
+                if (el) el.classList.add('nav-active');
+                loadPageData(id);
+            };
+
+            async function loadPageData(id) {
+                showLoader(true);
+                const res = await gasRun('getDashboardData', Auth.token);
+                if (res.sessionExpired) return Auth.clear();
+
+                if (id === 'dashboard') {
+                    document.getElementById('dashSaldo').innerText = 'Rp ' + res.saldoAktual.toLocaleString();
+                    document.getElementById('dashMasuk').innerText = 'Rp ' + res.masukBulan.toLocaleString();
+                    document.getElementById('dashKeluar').innerText = 'Rp ' + res.keluarBulan.toLocaleString();
+                    document.getElementById('dashTrxBody').innerHTML = res.recent.map(t => `
+                        <tr class="border-b">
+                            <td class="p-4 font-medium">${t.tgl}</td>
+                            <td class="p-4"><span class="px-2 py-1 rounded-md font-bold text-[9px] ${t.jenis === 'PEMASUKAN' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}">${t.jenis}</span></td>
+                            <td class="p-4 font-bold text-slate-700">Rp ${t.nom.toLocaleString()}</td>
+                            <td class="p-4 text-slate-400 italic">${t.ket}</td>
+                        </tr>
+                    `).join('') || '<tr><td colspan="4" class="p-10 text-center text-slate-300">Belum ada transaksi</td></tr>';
+                }
+
+                if (id === 'pemasukan' || id === 'pengeluaran') {
+                    const dataRes = await gasRun('getTransactions', Auth.token, id.toUpperCase());
+                    const canEdit = Auth.user.role !== 'MEMBER';
+                    document.getElementById(id + 'Body').innerHTML = dataRes.data.map(r => `
+                        <tr class="border-b hover:bg-slate-50 transition-colors">
+                            <td class="p-4">${r.tanggal}</td>
+                            <td class="p-4 font-medium">${r.kategori_nama}</td>
+                            <td class="p-4">${r.pihak_terkait}</td>
+                            <td class="p-4 text-right font-black">Rp ${r.nominal.toLocaleString()}</td>
+                            <td class="p-4 text-center">
+                                ${canEdit ? `<button onclick="editTrx('${r.transaksi_id}', '${r.jenis}')" class="text-blue-500 p-1"><i class="fas fa-edit"></i></button>
+                                <button onclick="deleteTrx('${r.transaksi_id}')" class="text-rose-500 p-1 ml-1"><i class="fas fa-trash"></i></button>` : '-'}
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+
+                if (id === 'saldo') {
+                    const sRes = await gasRun('getTransactions', Auth.token);
+                    document.getElementById('saldoBody').innerHTML = sRes.data.map(r => `
+                        <tr class="border-b">
+                            <td class="p-3">${r.tanggal}</td><td class="p-3 font-mono">${r.nomor_transaksi}</td>
+                            <td class="p-3"><span class="px-2 py-0.5 rounded font-bold ${r.jenis === 'PEMASUKAN' ? 'text-emerald-500' : 'text-rose-500'}">${r.jenis}</span></td>
+                            <td class="p-3 text-right font-bold">Rp ${r.nominal.toLocaleString()}</td>
+                        </tr>
+                    `).join('');
+                }
+
+                if (id === 'log') {
+                    const lRes = await gasRun('getLogs', Auth.token);
+                    document.getElementById('logBody').innerHTML = lRes.data.map(l => `
+                        <tr class="border-b"><td class="p-3">${l.waktu}</td><td class="p-3 font-bold">${l.user}</td><td class="p-3">${l.act}</td><td class="p-3">${l.modul}</td><td class="p-3 text-slate-400">${l.ket}</td></tr>
+                    `).join('');
+                }
+
+                if (id === 'akun') {
+                    const uRes = await gasRun('getUsers', Auth.token);
+                    document.getElementById('akunBody').innerHTML = uRes.data.map(u => `
+                        <tr class="border-b">
+                            <td class="p-4 font-bold text-slate-700">${u.nama}</td>
+                            <td class="p-4 text-slate-500">${u.user}</td>
+                            <td class="p-4 font-medium text-blue-600">${u.role}</td>
+                            <td class="p-4 text-center"><span class="px-2 py-1 rounded text-[10px] font-bold ${u.status === 'AKTIF' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}">${u.status}</span></td>
+                            <td class="p-4 text-center">
+                                <button onclick="editUser('${u.id}')" class="text-indigo-500 hover:text-indigo-700 mr-2"><i class="fas fa-user-edit"></i></button>
+                                <button onclick="deleteUser('${u.id}')" class="text-rose-400 hover:text-rose-600"><i class="fas fa-trash-alt"></i></button>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+                showLoader(false);
+            }
+
+            // --- USER MANAGEMENT LOGIC ---
+
+            window.openUserForm = () => {
+                document.getElementById('formAkun').reset();
+                document.getElementById('u_id').value = '';
+                document.getElementById('u_username').disabled = false;
+                document.getElementById('u_password').required = true;
+                document.getElementById('userModalTitle').innerText = 'Daftarkan Anggota Baru';
+                document.getElementById('modalAkun').classList.remove('hidden');
+            };
+
+            window.editUser = async (id) => {
+                showLoader(true);
+                const res = await gasRun('getUsers', Auth.token);
+                const u = res.data.find(x => x.id === id);
+                showLoader(false);
+                if (u) {
+                    document.getElementById('u_id').value = u.id;
+                    document.getElementById('u_nama').value = u.nama;
+                    document.getElementById('u_username').value = u.user;
+                    document.getElementById('u_username').disabled = true;
+                    document.getElementById('u_role').value = u.role;
+                    document.getElementById('u_status').value = u.status;
+                    document.getElementById('u_password').required = false;
+                    document.getElementById('userModalTitle').innerText = 'Edit Data Anggota';
+                    document.getElementById('modalAkun').classList.remove('hidden');
+                }
+            };
+
+            window.handleSaveUser = async (e) => {
+                e.preventDefault();
+                showLoader(true);
+                const payload = {
+                    id: document.getElementById('u_id').value,
+                    nama: document.getElementById('u_nama').value,
+                    username: document.getElementById('u_username').value,
+                    password: document.getElementById('u_password').value,
+                    role: document.getElementById('u_role').value,
+                    status: document.getElementById('u_status').value
+                };
+                const res = await gasRun('saveUser', Auth.token, payload);
+                showLoader(false);
+                if (res.success) {
+                    Swal.fire('Berhasil', 'Data anggota berhasil diperbarui', 'success');
+                    closeUserModal();
+                    loadPageData('akun');
+                } else Swal.fire('Error', res.message, 'error');
+            };
+
+            window.deleteUser = async (id) => {
+                const { isConfirmed } = await Swal.fire({ title: 'Hapus Akun?', text: 'Akun akan dihapus permanen dari sistem', icon: 'warning', showCancelButton: true });
+                if (isConfirmed) {
+                    showLoader(true);
+                    await gasRun('deleteUser', Auth.token, id);
+                    showLoader(false);
+                    loadPageData('akun');
+                }
+            };
+
+            window.closeUserModal = () => document.getElementById('modalAkun').classList.add('hidden');
+
+            // --- TRANSAKSI LOGIC (Sama seperti sebelumnya) ---
+
+            window.openTrxForm = async (jenis, id = null) => {
+                showLoader(true);
+                const katRes = await gasRun('getKategori', Auth.token, jenis);
+                document.getElementById('f_kategori').innerHTML = katRes.data.map(k => `<option value="${k.id}">${k.nama}</option>`).join('');
+                document.getElementById('f_id').value = id || '';
+                document.getElementById('f_jenis').value = jenis;
+                document.getElementById('f_tanggal').value = new Date().toISOString().split('T')[0];
+                document.getElementById('f_nominal').value = '';
+                document.getElementById('f_pihak').value = '';
+                document.getElementById('f_keterangan').value = '';
+                document.getElementById('modalTitle').innerText = (id ? 'Edit ' : 'Input ') + jenis;
+                document.getElementById('labelPihak').innerText = jenis === 'PEMASUKAN' ? 'Sumber Dana / Dari' : 'Penerima / Kepada';
+                document.getElementById('modalTrx').classList.remove('hidden');
+                showLoader(false);
+            };
+
+            window.editTrx = async (id, jenis) => {
+                await openTrxForm(jenis, id);
+                showLoader(true);
+                const all = await gasRun('getTransactions', Auth.token, jenis);
+                const item = all.data.find(x => x.transaksi_id === id);
+                if (item) {
+                    document.getElementById('f_tanggal').value = item.tanggal;
+                    document.getElementById('f_kategori').value = item.kategori_id;
+                    document.getElementById('f_pihak').value = item.pihak_terkait;
+                    document.getElementById('f_nominal').value = item.nominal;
+                    document.getElementById('f_keterangan').value = item.keterangan;
+                }
+                showLoader(false);
+            };
+
+            window.handleSaveTrx = async (e) => {
+                e.preventDefault();
+                showLoader(true);
+                const payload = {
+                    transaksi_id: document.getElementById('f_id').value,
+                    jenis: document.getElementById('f_jenis').value,
+                    tanggal: document.getElementById('f_tanggal').value,
+                    kategori_id: document.getElementById('f_kategori').value,
+                    pihak_terkait: document.getElementById('f_pihak').value,
+                    nominal: Number(document.getElementById('f_nominal').value),
+                    keterangan: document.getElementById('f_keterangan').value
+                };
+                const res = await gasRun('saveTransaction', Auth.token, payload);
+                showLoader(false);
+                if (res.success) { Swal.fire('Berhasil', 'Data transaksi disimpan', 'success'); closeTrx(); loadPageData(activePage); }
+                else Swal.fire('Gagal', res.message, 'error');
+            };
+
+            window.deleteTrx = async (id) => {
+                const { isConfirmed } = await Swal.fire({ title: 'Hapus?', text: 'Hapus data ini?', icon: 'warning', showCancelButton: true });
+                if (isConfirmed) { showLoader(true); await gasRun('deleteTransaction', Auth.token, id); showLoader(false); loadPageData(activePage); }
+            };
+
+            window.closeTrx = () => document.getElementById('modalTrx').classList.add('hidden');
+
+            window.generateLaporan = async () => {
+                const b = document.getElementById('lapBulan').value, t = document.getElementById('lapTahun').value;
+                showLoader(true);
+                const res = await gasRun('getLaporanData', Auth.token, b, t);
+                showLoader(false);
+                document.getElementById('lapPeriodeText').innerText = `Periode: ${b} / ${t}`;
+                document.getElementById('lapTotalMasuk').innerText = 'Rp ' + res.totalMasuk.toLocaleString();
+                document.getElementById('lapTotalKeluar').innerText = 'Rp ' + res.totalKeluar.toLocaleString();
+                document.getElementById('lapTableBody').innerHTML = res.data.map(r => `
+                    <tr><td class="border p-2">${r.tanggal}</td><td class="border p-2">${r.nomor_transaksi}</td><td class="border p-2">${r.keterangan}</td>
+                    <td class="border p-2 text-right">${r.jenis === 'PEMASUKAN' ? 'Rp '+r.nominal.toLocaleString() : '-'}</td>
+                    <td class="border p-2 text-right">${r.jenis === 'PENGELUARAN' ? 'Rp '+r.nominal.toLocaleString() : '-'}</td></tr>
+                `).join('');
+                document.getElementById('printArea').classList.remove('hidden');
+            };
+
+            Auth.init();
+        })();
+    </script>
+</body>
+</html>
