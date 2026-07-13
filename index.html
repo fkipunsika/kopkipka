@@ -73,10 +73,13 @@
         </div>
     </section>
 
-   <!-- MAIN APP -->
-    <section id="mainApp" class="flex min-h-screen hidden">
-        <aside class="fixed inset-y-0 left-0 z-40 w-64 bg-slate-900 border-r border-slate-800 transform -translate-x-full lg:translate-x-0 transition-transform no-print">
-            <div class="flex flex-col h-full">
+  <!-- MAIN APP -->
+    <section id="mainApp" class="flex min-h-screen hidden relative w-full overflow-hidden">
+        <!-- MOBILE OVERLAY -->
+        <div id="mobileOverlay" onclick="toggleMobileMenu()" class="fixed inset-0 bg-slate-900/50 z-30 hidden lg:hidden backdrop-blur-sm transition-opacity"></div>
+        
+        <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 bg-slate-900 border-r border-slate-800 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out no-print">
+            <div class="flex flex-col h-full"> 
                 <div class="p-4 border-b border-slate-800 flex items-center gap-3 bg-slate-950">
                     <div class="w-7 h-7 bg-slate-700 rounded-sm flex items-center justify-center text-white font-bold border border-slate-600 text-xs">K</div>
                     <h2 class="font-bold text-slate-100 tracking-tight text-sm uppercase">KOPKIPKA</h2>
@@ -116,9 +119,14 @@
             </div>
         </aside>
 
-        <main class="flex-1 lg:ml-64 flex flex-col bg-slate-100">
-            <header class="h-12 bg-white border-b border-slate-200 flex items-center justify-between px-6 sticky top-0 z-30 no-print">
-                <h2 id="pageTitle" class="text-sm font-bold text-slate-800 uppercase tracking-wide">Dashboard</h2>
+       <main class="flex-1 lg:ml-64 flex flex-col bg-slate-100 min-h-screen w-full">
+            <header class="h-12 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 sticky top-0 z-20 no-print">
+                <div class="flex items-center gap-3">
+                    <button onclick="toggleMobileMenu()" class="lg:hidden text-slate-500 hover:text-slate-800 focus:outline-none">
+                        <i class="fas fa-bars text-lg"></i>
+                    </button>
+                    <h2 id="pageTitle" class="text-sm font-bold text-slate-800 uppercase tracking-wide">Dashboard</h2>
+                </div>
                 <div class="flex items-center gap-3">
                     <div class="text-right hidden sm:block">
                         <p id="dispName" class="text-xs font-bold text-slate-800 leading-none">-</p>
@@ -460,7 +468,15 @@
                 } else { lp.classList.remove('hidden'); ma.classList.add('hidden'); }
             }
 
-            let activePage = 'dashboard';
+        let activePage = 'dashboard';
+
+            window.toggleMobileMenu = () => {
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.getElementById('mobileOverlay');
+                sidebar.classList.toggle('-translate-x-full');
+                overlay.classList.toggle('hidden');
+            };
+
             window.showPage = (id, el) => {
                 activePage = id;
                 document.querySelectorAll('.app-page').forEach(p => p.classList.add('hidden'));
@@ -468,6 +484,13 @@
                 document.getElementById('pageTitle').innerText = id.charAt(0).toUpperCase() + id.slice(1);
                 document.querySelectorAll('.nav-item-custom').forEach(n => n.classList.remove('nav-active'));
                 if (el) el.classList.add('nav-active');
+                
+                // Otomatis menutup sidebar di mobile saat menu diklik
+                const sidebar = document.getElementById('sidebar');
+                if (window.innerWidth < 1024 && sidebar && !sidebar.classList.contains('-translate-x-full')) {
+                    toggleMobileMenu();
+                }
+                
                 loadPageData(id);
             };
 
